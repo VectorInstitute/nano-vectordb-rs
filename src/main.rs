@@ -1,9 +1,10 @@
 use anyhow::Result;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, VecDeque, HashSet};
+use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::cmp::Ordering;
 use std::fs;
 use std::path::PathBuf;
-use uuid::Uuid;
 use base64::{engine::general_purpose, Engine as _};
 
 const F_ID: &str = "__id__";
@@ -62,14 +63,33 @@ pub struct NanoVectorDB {
     storage: DataBase,
 }
 
+#[derive(PartialEq)]
+struct ScoredIndex {
+    score: Float,
+    index: usize,
+}
+
+impl Eq for ScoredIndex {}
+
+impl PartialOrd for ScoredIndex {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.score.partial_cmp(&other.score)
+    }
+}
+
+impl Ord for ScoredIndex {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap_or(Ordering::Equal)
+    }
+}
+
 impl NanoVectorDB {
     pub fn new(embedding_dim: usize, storage_file: &str) -> Result<Self> {
         let storage_file = PathBuf::from(storage_file);
         let storage = if storage_file.exists() {
             let contents = fs::read_to_string(&storage_file)?;
-            let db: DataBase = serde_json::from_str(&contents)?; // Removed mut
+            let db: DataBase = serde_json::from_str(&contents)?;
             
-            // Verify matrix dimensions
             let expected_len = db.data.len() * db.embedding_dim;
             if db.matrix.len() != expected_len {
                 anyhow::bail!("Matrix size mismatch: expected {}, got {}", expected_len, db.matrix.len());
@@ -98,7 +118,6 @@ impl NanoVectorDB {
         let mut inserts = Vec::new();
         let existing_ids: HashSet<_> = self.storage.data.iter().map(|d| &d.id).collect();
 
-        // Process updates
         for data in datas.iter_mut() {
             if existing_ids.contains(&data.id) {
                 if let Some(pos) = self.storage.data.iter().position(|d| d.id == data.id) {
@@ -111,7 +130,6 @@ impl NanoVectorDB {
             }
         }
 
-        // Process inserts
         let new_datas: Vec<Data> = datas
             .into_iter()
             .filter(|d| !existing_ids.contains(&d.id))
@@ -119,7 +137,7 @@ impl NanoVectorDB {
 
         for data in new_datas {
             let norm_vec = normalize(&data.vector);
-            let vec_clone = norm_vec.clone(); // Clone the normalized vector
+            let vec_clone = norm_vec.clone();
             self.storage.matrix.extend(vec_clone);
             self.storage.data.push(Data {
                 id: data.id.clone(),
@@ -137,33 +155,63 @@ impl NanoVectorDB {
         query: &[Float],
         top_k: usize,
         better_than: Option<Float>,
-        filter: Option<&dyn Fn(&Data) -> bool>,
+        filter: Option<Box<dyn Fn(&Data) -> bool + Send + Sync>>,
     ) -> Vec<HashMap<String, serde_json::Value>> {
         let query_norm = normalize(query);
-        let mut scores = Vec::with_capacity(self.storage.data.len());
+        let embedding_dim = self.embedding_dim;
+        let matrix = &self.storage.matrix;
+        let threshold = better_than.unwrap_or(Float::MIN);
 
-        for (idx, data) in self.storage.data.iter().enumerate() {
-            if let Some(filter) = filter {
-                if !filter(data) {
-                    continue;
-                }
-            }
-            
-            let start = idx * self.embedding_dim;
-            let vector = &self.storage.matrix[start..start + self.embedding_dim];
-            let score = dot_product(&query_norm, vector);
-            scores.push((score, idx));
-        }
+        // Precompute query chunks for SIMD-friendly operations
+        let query_chunks: Vec<[Float; 4]> = query_norm
+            .chunks_exact(4)
+            .map(|chunk| [chunk[0], chunk[1], chunk[2], chunk[3]])
+            .collect();
+        let query_remainder = &query_norm[query_chunks.len() * 4..];
 
-        scores.sort_unstable_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
-        
-        scores.iter()
-            .take(top_k)
-            .filter(|(score, _)| better_than.map(|t| *score >= t).unwrap_or(true))
-            .map(|(score, idx)| {
-                let data = &self.storage.data[*idx];
+        // Parallel processing with Rayon
+        let heap = matrix
+            .par_chunks(embedding_dim)
+            .enumerate()
+            .filter(|(idx, _)| {
+                filter.as_ref().map(|f| f(&self.storage.data[*idx])).unwrap_or(true)
+            })
+            .fold(
+                || BinaryHeap::with_capacity(top_k + 1),
+                |mut heap, (idx, vector)| {
+                    let score = dot_product(vector, &query_chunks, query_remainder);
+                    
+                    if score >= threshold {
+                        heap.push(ScoredIndex { score, index: idx });
+                        if heap.len() > top_k {
+                            heap.pop();
+                        }
+                    }
+                    heap
+                },
+            )
+            .reduce(
+                || BinaryHeap::with_capacity(top_k + 1),
+                |mut heap1, heap2| {
+                    for si in heap2 {
+                        heap1.push(si);
+                        if heap1.len() > top_k {
+                            heap1.pop();
+                        }
+                    }
+                    heap1
+                },
+            );
+
+        // Convert to sorted results
+        let mut sorted = heap.into_sorted_vec();
+        sorted.reverse();
+
+        sorted.into_iter()
+            .map(|si| {
+                let data = &self.storage.data[si.index];
                 let mut result = data.fields.clone();
-                result.insert(F_METRICS.to_string(), serde_json::json!(score));
+                result.insert(F_METRICS.to_string(), serde_json::json!(si.score));
                 result.insert(F_ID.to_string(), serde_json::json!(data.id));
                 result
             })
@@ -177,66 +225,32 @@ impl NanoVectorDB {
     }
 }
 
-#[derive(Debug)]
-pub struct MultiTenantNanoVDB {
-    embedding_dim: usize,
-    max_capacity: usize,
-    storage_dir: PathBuf,
-    tenants: HashMap<String, NanoVectorDB>,
-    lru: VecDeque<String>,
+#[inline]
+fn dot_product(
+    vec: &[Float],
+    query_chunks: &[[Float; 4]],
+    query_remainder: &[Float],
+) -> Float {
+    let mut sum = 0.0;
+    let mut vec_chunks = vec.chunks_exact(4);
+    
+    // Process chunks of 4 elements
+    for (i, chunk) in vec_chunks.by_ref().enumerate() {
+        let q = query_chunks[i];
+        sum += chunk[0] * q[0] +
+               chunk[1] * q[1] +
+               chunk[2] * q[2] +
+               chunk[3] * q[3];
+    }
+
+    // Process remainder elements
+    sum + vec_chunks.remainder()
+        .iter()
+        .zip(query_remainder)
+        .map(|(a, b)| a * b)
+        .sum::<Float>()
 }
 
-impl MultiTenantNanoVDB {
-    pub fn new(embedding_dim: usize, max_capacity: usize, storage_dir: &str) -> Self {
-        let storage_dir = PathBuf::from(storage_dir);
-        // Create directory if it doesn't exist
-        if !storage_dir.exists() {
-            fs::create_dir_all(&storage_dir).expect("Failed to create storage directory");
-        }
-        
-        Self {
-            embedding_dim,
-            max_capacity,
-            storage_dir,
-            tenants: HashMap::new(),
-            lru: VecDeque::new(),
-        }
-    }
-
-    pub fn create_tenant(&mut self) -> String {
-        let tenant_id = Uuid::new_v4().to_string();
-        let storage_path = self.storage_dir.join(format!("{tenant_id}.json"));
-        
-        // Ensure directory exists before creating tenant
-        if !self.storage_dir.exists() {
-            fs::create_dir_all(&self.storage_dir).expect("Failed to create tenant directory");
-        }
-
-        let db = NanoVectorDB::new(self.embedding_dim, storage_path.to_str().unwrap())
-            .expect("Failed to create tenant DB");
-        
-        self.lru.push_back(tenant_id.clone());
-        self.tenants.insert(tenant_id.clone(), db);
-        
-        if self.tenants.len() > self.max_capacity {
-            if let Some(oldest) = self.lru.pop_front() {
-                self.tenants.remove(&oldest);
-            }
-        }
-        
-        tenant_id
-    }
-
-    pub fn get_tenant(&mut self, tenant_id: &str) -> Option<&mut NanoVectorDB> {
-        if let Some(index) = self.lru.iter().position(|id| id == tenant_id) {
-            self.lru.remove(index);
-        }
-        self.lru.push_back(tenant_id.to_string());
-        self.tenants.get_mut(tenant_id)
-    }
-}
-
-// Helper functions
 fn normalize(vector: &[Float]) -> Vec<Float> {
     let norm = vector.iter()
         .map(|x| x.powi(2))
@@ -245,13 +259,6 @@ fn normalize(vector: &[Float]) -> Vec<Float> {
     vector.iter().map(|x| x / norm).collect()
 }
 
-fn dot_product(a: &[Float], b: &[Float]) -> Float {
-    a.iter().zip(b.iter())
-        .map(|(x, y)| x * y)
-        .sum()
-}
-
-// Updated main function with optimizations
 fn main() -> Result<()> {
     use std::time::Instant;
     use std::fs;
@@ -260,9 +267,7 @@ fn main() -> Result<()> {
     let num_vectors = 100_000;
     let query_vector = vec![0.2; embedding_dim];
 
-    // Cleanup previous runs
     let _ = fs::remove_file("data.json");
-    let _ = fs::remove_dir_all("tenants");
 
     let mut db = NanoVectorDB::new(embedding_dim, "data.json")?;
 
@@ -310,4 +315,3 @@ fn main() -> Result<()> {
     fs::remove_file("data.json")?;
     Ok(())
 }
-
