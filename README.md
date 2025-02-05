@@ -1,2 +1,2 @@
 # nano-vectordb-rs
-A simple Vector Database in rust
+A simple vector database in rust
