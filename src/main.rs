@@ -16,7 +16,7 @@ pub struct Data {
     pub id: String,
     #[serde(skip)]
     pub vector: Vec<Float>,
-    #[serde(flatten)]
+    #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
     pub fields: HashMap<String, serde_json::Value>,
 }
 
@@ -24,20 +24,33 @@ pub struct Data {
 struct DataBase {
     embedding_dim: usize,
     data: Vec<Data>,
-    matrix: Vec<Vec<Float>>,
+    #[serde(with = "base64_bytes")]
+    matrix: Vec<Float>,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
     additional_data: HashMap<String, serde_json::Value>,
 }
 
-impl DataBase {
-    fn matrix_base64(&self) -> Result<String> {
-        let flat: Vec<Float> = self.matrix.iter().flatten().copied().collect();
+mod base64_bytes {
+    use super::*;
+    use serde::{Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(vec: &[Float], serializer: S) -> Result<S::Ok, S::Error> {
         let bytes = unsafe {
             std::slice::from_raw_parts(
-                flat.as_ptr() as *const u8,
-                flat.len() * std::mem::size_of::<Float>(),
+                vec.as_ptr() as *const u8,
+                vec.len() * std::mem::size_of::<Float>(),
             )
         };
-        Ok(general_purpose::STANDARD.encode(bytes))
+        let b64 = general_purpose::STANDARD.encode(bytes);
+        serializer.serialize_str(&b64)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<Float>, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        let bytes = general_purpose::STANDARD.decode(s).map_err(serde::de::Error::custom)?;
+        Ok(bytes.chunks_exact(4)
+            .map(|chunk| Float::from_le_bytes(chunk.try_into().unwrap()))
+            .collect())
     }
 }
 
@@ -54,8 +67,14 @@ impl NanoVectorDB {
         let storage_file = PathBuf::from(storage_file);
         let storage = if storage_file.exists() {
             let contents = fs::read_to_string(&storage_file)?;
-            let mut db: DataBase = serde_json::from_str(&contents)?;
-            db.matrix = decode_matrix(&db.matrix_base64()?, embedding_dim)?;
+            let db: DataBase = serde_json::from_str(&contents)?; // Removed mut
+            
+            // Verify matrix dimensions
+            let expected_len = db.data.len() * db.embedding_dim;
+            if db.matrix.len() != expected_len {
+                anyhow::bail!("Matrix size mismatch: expected {}, got {}", expected_len, db.matrix.len());
+            }
+            
             db
         } else {
             DataBase {
@@ -74,53 +93,41 @@ impl NanoVectorDB {
         })
     }
 
-    pub fn get_embedding_dim(&self) -> usize {
-        self.embedding_dim
-    }
-    
-    pub fn get_metric(&self) -> &str {
-        &self.metric
-    }
-
-    #[allow(dead_code)]
-    fn matrix_base64(&self) -> Result<String> {
-        let bytes = unsafe {
-            std::slice::from_raw_parts(
-                self.storage.matrix.as_ptr() as *const u8,
-                self.storage.matrix.len() * std::mem::size_of::<Float>(),
-            )
-        };
-        Ok(general_purpose::STANDARD.encode(bytes))
-    }
-
     pub fn upsert(&mut self, mut datas: Vec<Data>) -> Result<(Vec<String>, Vec<String>)> {
         let mut updates = Vec::new();
         let mut inserts = Vec::new();
         let existing_ids: HashSet<_> = self.storage.data.iter().map(|d| &d.id).collect();
 
+        // Process updates
         for data in datas.iter_mut() {
             if existing_ids.contains(&data.id) {
                 if let Some(pos) = self.storage.data.iter().position(|d| d.id == data.id) {
-                    self.storage.matrix[pos] = data.vector.clone();
+                    let norm_vec = normalize(&data.vector);
+                    let start = pos * self.embedding_dim;
+                    let end = start + self.embedding_dim;
+                    self.storage.matrix[start..end].copy_from_slice(&norm_vec);
                     updates.push(data.id.clone());
                 }
             }
         }
 
+        // Process inserts
         let new_datas: Vec<Data> = datas
             .into_iter()
             .filter(|d| !existing_ids.contains(&d.id))
             .collect();
 
         for data in new_datas {
-            self.storage.data.push(data);
-            inserts.push(self.storage.data.last().unwrap().id.clone());
+            let norm_vec = normalize(&data.vector);
+            let vec_clone = norm_vec.clone(); // Clone the normalized vector
+            self.storage.matrix.extend(vec_clone);
+            self.storage.data.push(Data {
+                id: data.id.clone(),
+                vector: norm_vec,
+                fields: data.fields,
+            });
+            inserts.push(data.id);
         }
-
-        self.storage.matrix = self.storage.data
-            .iter()
-            .map(|d| normalize(&d.vector))
-            .collect();
 
         Ok((updates, inserts))
     }
@@ -142,7 +149,9 @@ impl NanoVectorDB {
                 }
             }
             
-            let score = dot_product(&query_norm, &self.storage.matrix[idx]);
+            let start = idx * self.embedding_dim;
+            let vector = &self.storage.matrix[start..start + self.embedding_dim];
+            let score = dot_product(&query_norm, vector);
             scores.push((score, idx));
         }
 
@@ -152,9 +161,10 @@ impl NanoVectorDB {
             .take(top_k)
             .filter(|(score, _)| better_than.map(|t| *score >= t).unwrap_or(true))
             .map(|(score, idx)| {
-                let mut result = self.storage.data[*idx].fields.clone();
+                let data = &self.storage.data[*idx];
+                let mut result = data.fields.clone();
                 result.insert(F_METRICS.to_string(), serde_json::json!(score));
-                result.insert(F_ID.to_string(), serde_json::json!(self.storage.data[*idx].id));
+                result.insert(F_ID.to_string(), serde_json::json!(data.id));
                 result
             })
             .collect()
@@ -241,24 +251,7 @@ fn dot_product(a: &[Float], b: &[Float]) -> Float {
         .sum()
 }
 
-fn decode_matrix(base64_str: &str, dim: usize) -> Result<Vec<Vec<Float>>> {
-    let bytes = general_purpose::STANDARD.decode(base64_str)?;
-    let floats: Vec<Float> = bytes.chunks_exact(4)
-        .map(|chunk| {
-            let bytes: [u8; 4] = chunk.try_into().unwrap();
-            Float::from_le_bytes(bytes)
-        })
-        .collect();
-    
-    if floats.len() % dim != 0 {
-        anyhow::bail!("Invalid matrix dimensions");
-    }
-    
-    Ok(floats.chunks(dim)
-        .map(|chunk| chunk.to_vec())
-        .collect())
-}
-
+// Updated main function with optimizations
 fn main() -> Result<()> {
     use std::time::Instant;
     use std::fs;
@@ -267,33 +260,32 @@ fn main() -> Result<()> {
     let num_vectors = 100_000;
     let query_vector = vec![0.2; embedding_dim];
 
-    // Clean up previous runs
+    // Cleanup previous runs
     let _ = fs::remove_file("data.json");
     let _ = fs::remove_dir_all("tenants");
 
-    // Initialize database
     let mut db = NanoVectorDB::new(embedding_dim, "data.json")?;
 
-    // Benchmark insertion
+    // Insert benchmark
     let insert_start = Instant::now();
-    let mut data_vec = Vec::with_capacity(num_vectors);
-    for i in 0..num_vectors {
-        data_vec.push(Data {
-            id: format!("vec_{i}"),  // Fixed format string
+    let data_vec: Vec<Data> = (0..num_vectors)
+        .map(|i| Data {
+            id: format!("vec_{i}"),
             vector: vec![0.1; embedding_dim],
             fields: HashMap::new(),
-        });
-    }
-    let (_updates, inserts) = db.upsert(data_vec)?;
-    let insert_duration = insert_start.elapsed();
+        })
+        .collect();
     
+    let (_, inserts) = db.upsert(data_vec)?;
+    let insert_duration = insert_start.elapsed();
+
     println!("Embedding Dim: {embedding_dim}");
     println!("Inserted {} vectors in {:.2}ms", 
         inserts.len(),
         insert_duration.as_secs_f64() * 1000.0
     );
 
-    // Benchmark query
+    // Query benchmark
     let query_start = Instant::now();
     let results = db.query(&query_vector, 10, None, None);
     let query_duration = query_start.elapsed();
@@ -303,35 +295,19 @@ fn main() -> Result<()> {
         query_duration.as_secs_f64() * 1000.0
     );
     
-    // Safe result handling
     if let Some(top_result) = results.get(0) {
         println!("Top result score: {:.4}", 
             top_result.get(F_METRICS).unwrap().as_f64().unwrap()
         );
-    } else {
-        println!("No results found");
     }
 
-    // Save and report size
+    // Storage size
     db.save()?;
     let size = fs::metadata("data.json")?.len() as f64 / 1_000_000.0;
     println!("Storage size: {:.1}MB", size);
 
-    // Multi-tenant example with cleanup
-    let mut multi_db = MultiTenantNanoVDB::new(embedding_dim, 10, "tenants");
-    let tenant_id = multi_db.create_tenant();
-    let _tenant = multi_db.get_tenant(&tenant_id).unwrap();
-
-    // Clean up after benchmark
-    if PathBuf::from("data.json").exists() {
-        fs::remove_file("data.json")?;
-    }
-    
-    let tenants_dir = PathBuf::from("tenants");
-    if tenants_dir.exists() && tenants_dir.is_dir() {
-        fs::remove_dir_all("tenants")?;
-    }
-
+    // Cleanup
+    fs::remove_file("data.json")?;
     Ok(())
 }
 
