@@ -262,7 +262,7 @@ impl NanoVectorDB {
     pub fn len(&self) -> usize {
         self.storage.data.len()
     }
-    
+
     /// Check if database is empty (common Rust idiom)
     pub fn is_empty(&self) -> bool {
         self.storage.data.is_empty()

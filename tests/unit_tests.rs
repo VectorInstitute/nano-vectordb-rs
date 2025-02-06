@@ -1,4 +1,4 @@
-use nano_vectordb_rs::{NanoVectorDB, Data, constants};
+use nano_vectordb_rs::{constants, Data, NanoVectorDB};
 use std::collections::HashMap;
 use tempfile::NamedTempFile;
 
