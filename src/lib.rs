@@ -257,6 +257,16 @@ impl NanoVectorDB {
         fs::write(&self.storage_file, serialized)?;
         Ok(())
     }
+
+    /// Get the number of vectors in the database (added for test access)
+    pub fn len(&self) -> usize {
+        self.storage.data.len()
+    }
+
+    /// Check if database is empty (common Rust idiom)
+    pub fn is_empty(&self) -> bool {
+        self.storage.data.is_empty()
+    }
 }
 
 #[inline]
@@ -282,59 +292,4 @@ fn dot_product(vec: &[Float], query_chunks: &[[Float; 4]], query_remainder: &[Fl
 fn normalize(vector: &[Float]) -> Vec<Float> {
     let norm = vector.iter().map(|x| x.powi(2)).sum::<Float>().sqrt();
     vector.iter().map(|x| x / norm).collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::NamedTempFile;
-
-    #[test]
-    fn test_basic_operations() {
-        let temp_file = NamedTempFile::new().unwrap();
-        let path = temp_file.path().to_str().unwrap();
-
-        let mut db = NanoVectorDB::new(128, path).unwrap();
-
-        let data = Data {
-            id: "test".to_string(),
-            vector: vec![0.1; 128],
-            fields: HashMap::new(),
-        };
-        let (updates, inserts) = db.upsert(vec![data]).unwrap();
-        db.save().unwrap();
-
-        assert_eq!(inserts.len(), 1);
-        assert_eq!(updates.len(), 0);
-
-        let results = db.query(&vec![0.1; 128], 1, None, None);
-        assert!(!results.is_empty());
-        assert!(
-            results[0]
-                .get(constants::F_METRICS)
-                .unwrap()
-                .as_f64()
-                .unwrap()
-                > 0.99
-        );
-    }
-
-    #[test]
-    fn test_persistence() {
-        let temp_file = NamedTempFile::new().unwrap();
-        let path = temp_file.path().to_str().unwrap();
-
-        let mut db = NanoVectorDB::new(128, path).unwrap();
-        db.upsert(vec![Data {
-            id: "test".to_string(),
-            vector: vec![0.1; 128],
-            fields: HashMap::new(),
-        }])
-        .unwrap();
-        db.save().unwrap();
-
-        drop(db);
-        let db2 = NanoVectorDB::new(128, path).unwrap();
-        assert_eq!(db2.storage.data.len(), 1);
-    }
 }
