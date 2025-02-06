@@ -7,7 +7,12 @@ edition = "2021"
 anyhow = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 base64 = "0.21"
-uuid = { version = "1.6", features = ["v4", "serde"] }
-itertools = "0.12"
-serde_json = "1.0.138"
 rayon = "1.9"
+serde_json = "1.0"
+
+[dev-dependencies]
+tempfile = "3.3"
+
+[[bin]]
+name = "benchmark"
+path = "src/bin/benchmark.rs"
