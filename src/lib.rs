@@ -251,6 +251,32 @@ impl NanoVectorDB {
             .collect()
     }
 
+    /// Get vectors by their IDs
+    pub fn get(&self, ids: &[String]) -> Vec<&Data> {
+        let id_set: HashSet<_> = ids.iter().collect();
+        self.storage
+            .data
+            .iter()
+            .filter(|data| id_set.contains(&data.id))
+            .collect()
+    }
+
+    /// Delete vectors by their IDs
+    pub fn delete(&mut self, ids: &[String]) {
+        let id_set: HashSet<_> = ids.iter().collect();
+
+        // Filter out deleted entries
+        self.storage.data.retain(|data| !id_set.contains(&data.id));
+
+        // Rebuild matrix from remaining vectors
+        self.storage.matrix = self
+            .storage
+            .data
+            .iter()
+            .flat_map(|data| data.vector.iter().copied())
+            .collect();
+    }
+
     /// Saves the database to disk
     pub fn save(&self) -> Result<()> {
         let serialized = serde_json::to_string(&self.storage)?;
@@ -258,14 +284,29 @@ impl NanoVectorDB {
         Ok(())
     }
 
-    /// Get the number of vectors in the database (added for test access)
+    /// Get additional metadata stored in the database
+    pub fn get_additional_data(&self) -> &HashMap<String, serde_json::Value> {
+        &self.storage.additional_data
+    }
+
+    /// Store additional metadata in the database
+    pub fn store_additional_data(&mut self, data: HashMap<String, serde_json::Value>) {
+        self.storage.additional_data = data;
+    }
+
+    /// Get the number of vectors in the database
     pub fn len(&self) -> usize {
         self.storage.data.len()
     }
 
-    /// Check if database is empty (common Rust idiom)
+    /// Check if database is empty
     pub fn is_empty(&self) -> bool {
         self.storage.data.is_empty()
+    }
+
+    /// Get total vector bytes length
+    pub fn vector_bytes_len(&self) -> usize {
+        self.storage.matrix.len()
     }
 }
 
