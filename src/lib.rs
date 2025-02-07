@@ -311,18 +311,23 @@ impl NanoVectorDB {
 }
 
 #[inline]
-fn dot_product(vec: &[Float], query_chunks: &[[Float; 4]], query_remainder: &[Float]) -> Float {
-    let mut sum = 0.0;
-    let mut vec_chunks = vec.chunks_exact(4);
+/// Calculate the dot product between two vectors
+pub fn dot_product(vec: &[Float], query_chunks: &[[Float; 4]], query_remainder: &[Float]) -> Float {
+    assert_eq!(
+        query_chunks.len() * 4 + query_remainder.len(),
+        vec.len(),
+        "Mismatched lengths between vector and query components"
+    );
 
-    // Process chunks of 4 elements
-    for (i, chunk) in vec_chunks.by_ref().enumerate() {
-        let q = query_chunks[i];
-        sum += chunk[0] * q[0] + chunk[1] * q[1] + chunk[2] * q[2] + chunk[3] * q[3];
-    }
+    let sum = vec
+        .chunks_exact(4)
+        .zip(query_chunks)
+        .fold(0.0, |acc, (chunk, q)| {
+            acc + chunk.iter().zip(q).map(|(a, b)| a * b).sum::<Float>()
+        });
 
-    // Process remainder elements
-    sum + vec_chunks
+    sum + vec
+        .chunks_exact(4)
         .remainder()
         .iter()
         .zip(query_remainder)
@@ -330,7 +335,17 @@ fn dot_product(vec: &[Float], query_chunks: &[[Float; 4]], query_remainder: &[Fl
         .sum::<Float>()
 }
 
-fn normalize(vector: &[Float]) -> Vec<Float> {
-    let norm = vector.iter().map(|x| x.powi(2)).sum::<Float>().sqrt();
-    vector.iter().map(|x| x / norm).collect()
+/// Normalize a vector to unit length
+pub fn normalize(vector: &[Float]) -> Vec<Float> {
+    let norm_sq: Float = vector
+        .iter()
+        .fold(0.0 as Float, |acc, &x| x.mul_add(x, acc));
+
+    assert!(
+        norm_sq > Float::EPSILON,
+        "Cannot normalize zero-length vector"
+    );
+
+    let inv_norm = 1.0 / norm_sq.sqrt();
+    vector.iter().map(|&x| x * inv_norm).collect()
 }

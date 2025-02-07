@@ -1,4 +1,4 @@
-use nano_vectordb_rs::{constants, Data, NanoVectorDB};
+use nano_vectordb_rs::{constants, dot_product, normalize, Data, NanoVectorDB};
 use std::collections::HashMap;
 use tempfile::NamedTempFile;
 
@@ -139,4 +139,102 @@ fn test_delete_method() {
     let results = db.query(&vec![0.2; 128], 1, None, None);
     assert!(!results.is_empty());
     assert_eq!(results[0][constants::F_ID], "test2");
+}
+
+#[test]
+fn test_dot_product() {
+    type Float = f32; // Ensure this matches your actual type
+
+    // Test exact 4-element chunks
+    let vec4 = vec![1.0, 2.0, 3.0, 4.0];
+    let query4_chunks = &[[1.0, 1.0, 1.0, 1.0]];
+    let query4_remainder = &[];
+    assert_eq!(dot_product(&vec4, query4_chunks, query4_remainder), 10.0);
+
+    // Test with remainder
+    let vec5 = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+    let query5_chunks = &[[1.0, 1.0, 1.0, 1.0]];
+    let query5_remainder = &[1.0];
+    assert_eq!(dot_product(&vec5, query5_chunks, query5_remainder), 15.0);
+
+    // Test multiple chunks
+    let vec8 = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+    let query8_chunks = &[[1.0, 1.0, 1.0, 1.0], [2.0, 2.0, 2.0, 2.0]];
+    let query8_remainder = &[];
+    assert_eq!(dot_product(&vec8, query8_chunks, query8_remainder), 62.0);
+
+    // Test empty vectors
+    let vec_empty: &[Float] = &[];
+    let query_empty_chunks: &[[Float; 4]] = &[];
+    let query_empty_remainder: &[Float] = &[];
+    assert_eq!(
+        dot_product(vec_empty, query_empty_chunks, query_empty_remainder),
+        0.0
+    );
+
+    // Test negative values
+    let vec_neg = vec![2.0, -3.0];
+    let query_neg_chunks: &[[Float; 4]] = &[];
+    let query_neg_remainder = &[4.0, 5.0];
+    assert_eq!(
+        dot_product(&vec_neg, query_neg_chunks, query_neg_remainder),
+        -7.0
+    );
+
+    // Test zero values
+    let vec_zero = vec![0.0; 4];
+    let query_zero_chunks = &[[0.0; 4]];
+    let query_zero_remainder = &[];
+    assert_eq!(
+        dot_product(&vec_zero, query_zero_chunks, query_zero_remainder),
+        0.0
+    );
+
+    // Test mismatched lengths (should panic)
+    let vec_mismatch = vec![1.0, 2.0];
+    let query_mismatch_chunks = &[[1.0, 1.0, 1.0, 1.0]];
+    let query_mismatch_remainder = &[];
+    let result = std::panic::catch_unwind(|| {
+        dot_product(
+            &vec_mismatch,
+            query_mismatch_chunks,
+            query_mismatch_remainder,
+        )
+    });
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_normalization() {
+    type Float = f32;
+    let epsilon = 1e-5;
+
+    // Basic normalization
+    let v = vec![3.0, 4.0];
+    let normalized = normalize(&v);
+    let norm = normalized
+        .iter()
+        .fold(0.0 as Float, |acc, &x| x.mul_add(x, acc))
+        .sqrt();
+    assert!((norm - 1.0).abs() <= epsilon, "Norm: {}", norm);
+
+    // High-dimensional vector
+    let v = vec![1.0; 128];
+    let normalized = normalize(&v);
+    let expected = 1.0 / (128.0 as Float).sqrt();
+    assert!(
+        (normalized[0] - expected).abs() <= epsilon,
+        "Expected: {}, Actual: {}",
+        expected,
+        normalized[0]
+    );
+
+    // Precision test
+    let v = vec![1.0, 2.0, 3.0];
+    let normalized = normalize(&v);
+    let norm = normalized
+        .iter()
+        .fold(0.0 as Float, |acc, &x| x.mul_add(x, acc))
+        .sqrt();
+    assert!((norm - 1.0).abs() <= epsilon, "Norm: {}", norm);
 }
