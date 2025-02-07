@@ -55,15 +55,18 @@ jobs:
         run: cargo check --all-features
 
   test:
-    name: Run Tests
+    name: Coverage Tests
     runs-on: ubuntu-latest
     needs: check
+    container:
+      image: xd009642/tarpaulin:develop-nightly
+      options: --security-opt seccomp=unconfined
     steps:
       - uses: actions/checkout@v4
       
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: stable
+          toolchain: nightly
           components: llvm-tools-preview
       
       - name: Cache cargo
@@ -77,11 +80,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
       
-      - name: Run cargo-tarpaulin
-        uses: actions-rs/tarpaulin@v0.1
-        with:
-          version: '0.31.5'
-          args: --engine llvm --workspace --all-features --out Xml --output-dir target/tarpaulin/
+      - name: Run Tarpaulin
+        run: |
+          cargo tarpaulin --verbose \
+            --engine llvm \
+            --all-features \
+            --workspace \
+            --timeout 120 \
+            --out xml \
+            --output-dir target/tarpaulin/
       
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
