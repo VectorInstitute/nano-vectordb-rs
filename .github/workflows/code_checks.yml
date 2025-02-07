@@ -37,7 +37,7 @@ jobs:
           toolchain: stable
           components: rustfmt
       
-      - name: Cache cargo registry
+      - name: Cache cargo
         uses: actions/cache@v4
         with:
           path: |
@@ -45,6 +45,8 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       
       - name: Check formatting
         run: cargo fmt -- --check
@@ -64,7 +66,7 @@ jobs:
           toolchain: stable
           components: llvm-tools-preview
       
-      - name: Cache cargo registry
+      - name: Cache cargo
         uses: actions/cache@v4
         with:
           path: |
@@ -72,9 +74,13 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       
       - name: Install Tarpaulin
-        uses: taiki-e/install-action-tarpaulin@v1
+        uses: taiki-e/install-action@tarpaulin
+        with:
+          version: latest
       
       - name: Run tests with coverage
         run: cargo tarpaulin --engine llvm --workspace --all-features --out Xml --output-dir target/tarpaulin/
