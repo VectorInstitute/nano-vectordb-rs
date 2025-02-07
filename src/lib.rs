@@ -356,6 +356,7 @@ mod tests {
     use super::*;
     use serde_json;
     use std::collections::HashMap;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn test_base64_deserialization_edge_cases() {
@@ -383,5 +384,79 @@ mod tests {
         }"#;
         let result: Result<DataBase, _> = serde_json::from_str(invalid_json);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_matrix_size_validation() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let path = temp_file.path().to_str().unwrap();
+
+        // Create malformed database with mismatched matrix size
+        let corrupt_db = DataBase {
+            embedding_dim: 2,
+            data: vec![Data {
+                id: "bad_entry".to_string(),
+                vector: vec![1.0, 2.0], // Valid 2D vector
+                fields: HashMap::new(),
+            }],
+            matrix: vec![1.0], // Should be 2 elements for 2D embedding
+            additional_data: HashMap::new(),
+        };
+
+        // Write corrupted data to file
+        fs::write(path, serde_json::to_string(&corrupt_db).unwrap()).unwrap();
+
+        // Attempt to load with validation
+        let result = NanoVectorDB::new(2, path);
+
+        // Verify error handling
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Matrix size mismatch"));
+        assert!(err_msg.contains("expected 2"));
+        assert!(err_msg.contains("got 1"));
+    }
+
+    #[test]
+    fn test_scored_index_ordering() {
+        let cases = vec![
+            (
+                ScoredIndex {
+                    score: 0.9,
+                    index: 0,
+                },
+                ScoredIndex {
+                    score: 0.8,
+                    index: 1,
+                },
+                Ordering::Greater,
+            ),
+            (
+                ScoredIndex {
+                    score: 0.5,
+                    index: 0,
+                },
+                ScoredIndex {
+                    score: 0.5,
+                    index: 1,
+                },
+                Ordering::Equal,
+            ),
+            (
+                ScoredIndex {
+                    score: 0.3,
+                    index: 0,
+                },
+                ScoredIndex {
+                    score: 0.4,
+                    index: 1,
+                },
+                Ordering::Less,
+            ),
+        ];
+
+        for (a, b, expected) in cases {
+            assert_eq!(a.cmp(&b), expected);
+        }
     }
 }
