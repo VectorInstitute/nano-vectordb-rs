@@ -89,6 +89,8 @@ jobs:
             --timeout 120 \
             --out xml \
             --exclude-files "src/bin/*" \
+            --exclude-files "pulp/**" \
+            --skip-clean \
             --output-dir target/tarpaulin/
       
       - name: Upload to Codecov
