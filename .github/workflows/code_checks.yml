@@ -64,16 +64,27 @@ jobs:
           toolchain: stable
           components: llvm-tools-preview
       
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      
       - name: Install Tarpaulin
-        run: cargo install cargo-tarpaulin
+        uses: taiki-e/install-action-tarpaulin@v1
       
       - name: Run tests with coverage
-        run: cargo tarpaulin --workspace --all-features --out Xml --output-dir target/tarpaulin/
+        run: cargo tarpaulin --engine llvm --workspace --all-features --out Xml --output-dir target/tarpaulin/
         env:
           CARGO_INCREMENTAL: 0
       
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: amrit110/nano-vectordb-rs
           files: target/tarpaulin/cobertura.xml
           verbose: true
