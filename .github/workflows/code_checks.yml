@@ -78,8 +78,9 @@ jobs:
             ${{ runner.os }}-cargo-
       
       - name: Install Tarpaulin
-        uses: taiki-e/install-action@tarpaulin
+        uses: taiki-e/install-action@v2
         with:
+          tool: tarpaulin
           version: latest
       
       - name: Run tests with coverage
