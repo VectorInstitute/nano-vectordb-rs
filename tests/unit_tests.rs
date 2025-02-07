@@ -238,3 +238,41 @@ fn test_normalization() {
         .sqrt();
     assert!((norm - 1.0).abs() <= epsilon, "Norm: {}", norm);
 }
+
+#[test]
+#[should_panic(expected = "Cannot normalize zero-length vector")]
+fn test_zero_vector_normalization() {
+    let zero_vec = vec![0.0; 128];
+    normalize(&zero_vec);
+}
+
+#[test]
+fn test_empty_state_checks() {
+    let temp_file = NamedTempFile::new().unwrap();
+    let path = temp_file.path().to_str().unwrap();
+
+    // Fresh database should be empty
+    let mut db = NanoVectorDB::new(128, path).unwrap();
+    assert!(db.is_empty());
+    assert_eq!(db.len(), 0);
+
+    // Add some data and verify not empty
+    db.upsert(vec![Data {
+        id: "test".to_string(),
+        vector: vec![0.1; 128],
+        fields: HashMap::new(),
+    }])
+    .unwrap();
+    assert!(!db.is_empty());
+    assert_eq!(db.len(), 1);
+
+    // Delete all data and verify empty again
+    db.delete(&["test".to_string()]);
+    assert!(db.is_empty());
+    assert_eq!(db.len(), 0);
+
+    // Verify persistence of empty state
+    db.save().unwrap();
+    let db2 = NanoVectorDB::new(128, path).unwrap();
+    assert!(db2.is_empty());
+}
