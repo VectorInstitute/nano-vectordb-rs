@@ -77,16 +77,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
       
-      - name: Install Tarpaulin
-        uses: taiki-e/install-action@v2
+      - name: Run cargo-tarpaulin
+        uses: actions-rs/tarpaulin@v0.1
         with:
-          tool: tarpaulin
-          version: latest
-      
-      - name: Run tests with coverage
-        run: cargo tarpaulin --engine llvm --workspace --all-features --out Xml --output-dir target/tarpaulin/
-        env:
-          CARGO_INCREMENTAL: 0
+          version: '0.31.5'
+          args: --engine llvm --workspace --all-features --out Xml --output-dir target/tarpaulin/
       
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
