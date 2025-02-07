@@ -349,3 +349,39 @@ pub fn normalize(vector: &[Float]) -> Vec<Float> {
     let inv_norm = 1.0 / norm_sq.sqrt();
     vector.iter().map(|&x| x * inv_norm).collect()
 }
+
+/// Tests
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json;
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_base64_deserialization_edge_cases() {
+        // Test valid base64 deserialization
+        let valid_db = DataBase {
+            embedding_dim: 2,
+            data: vec![Data {
+                id: "test".to_string(),
+                vector: vec![1.0, 2.0],
+                fields: HashMap::new(),
+            }],
+            matrix: vec![1.0, 2.0],
+            additional_data: HashMap::new(),
+        };
+        let serialized = serde_json::to_string(&valid_db).unwrap();
+        let deserialized: DataBase = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized.matrix, vec![1.0, 2.0]);
+
+        // Test invalid base64 string
+        let invalid_json = r#"{
+            "embedding_dim": 2,
+            "data": [{"__id__": "test", "vector": [], "fields": {}}],
+            "matrix": "INVALID_BASE64!!",
+            "additional_data": {}
+        }"#;
+        let result: Result<DataBase, _> = serde_json::from_str(invalid_json);
+        assert!(result.is_err());
+    }
+}
