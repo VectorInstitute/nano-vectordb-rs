@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 fn main() -> anyhow::Result<()> {
     let config = BenchmarkConfig {
         embedding_dim: 1024,
-        num_vectors: 1_000_000,
+        num_vectors: 100_000,
         num_runs: 5,
     };
 
@@ -60,9 +60,9 @@ impl BenchmarkMetrics {
         let (size_mean, size_std) = calculate_stats(&self.file_sizes);
 
         println!("\nBenchmark Results ({} runs):", self.insert_times.len());
-        println!("==================================================");
+        println!("===================================");
         println!("Operation          | Mean ± Std Dev");
-        println!("----------------------------------");
+        println!("-----------------------------------");
         println!("Insert Time: {:7.2}ms ± {:.2}", ins_mean, ins_std);
         println!("Save Time:   {:7.2}ms ± {:.2}", save_mean, save_std);
         println!("Query Time:  {:7.3}ms ± {:.3}", q_mean, q_std);
