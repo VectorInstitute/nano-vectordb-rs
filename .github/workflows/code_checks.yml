@@ -85,7 +85,6 @@ jobs:
           cargo llvm-cov --verbose \
             --all-features \
             --workspace \
-            --ignore-filename-regex "candle*/**" \
             --ignore-filename-regex "src/bin/*" \
             --lcov \
             --output-path lcov.info
