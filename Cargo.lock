@@ -677,7 +677,7 @@ dependencies = [
  "num-traits",
  "once_cell",
  "paste",
- "pulp 0.18.22",
+ "pulp",
  "raw-cpuid",
  "rayon",
  "seq-macro",
@@ -1295,8 +1295,6 @@ dependencies = [
  "candle-nn",
  "candle-transformers",
  "hf-hub",
- "num-complex",
- "pulp 0.21.4",
  "rand 0.9.0",
  "rayon",
  "serde",
@@ -1604,20 +1602,6 @@ dependencies = [
  "libm",
  "num-complex",
  "reborrow",
-]
-
-[[package]]
-name = "pulp"
-version = "0.21.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95fb7a99b37aaef4c7dd2fd15a819eb8010bfc7a2c2155230d51f497316cad6d"
-dependencies = [
- "bytemuck",
- "cfg-if",
- "libm",
- "num-complex",
- "reborrow",
- "version_check",
 ]
 
 [[package]]
@@ -2510,12 +2494,6 @@ name = "vcpkg"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
-
-[[package]]
-name = "version_check"
-version = "0.9.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "walkdir"
