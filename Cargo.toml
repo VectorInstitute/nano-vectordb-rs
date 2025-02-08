@@ -25,3 +25,6 @@ anyhow = "1.0"
 [[bin]]
 name = "benchmark"
 path = "src/bin/benchmark.rs"
+
+[profile.test]
+opt-level = 0
