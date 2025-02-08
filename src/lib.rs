@@ -1,5 +1,6 @@
 //! A lightweight vector database implementation
 #![warn(missing_docs)]
+#![forbid(unsafe_code)]
 
 use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
@@ -47,11 +48,10 @@ struct DataBase {
 mod base64_bytes {
     use super::*;
     use serde::{Deserializer, Serializer};
+    use bytemuck::cast_slice;
 
     pub fn serialize<S: Serializer>(vec: &[Float], serializer: S) -> Result<S::Ok, S::Error> {
-        let bytes = unsafe {
-            std::slice::from_raw_parts(vec.as_ptr() as *const u8, std::mem::size_of_val(vec))
-        };
+        let bytes = cast_slice(vec);
         let b64 = general_purpose::STANDARD.encode(bytes);
         serializer.serialize_str(&b64)
     }
