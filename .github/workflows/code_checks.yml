@@ -58,16 +58,16 @@ jobs:
     name: Coverage Tests
     runs-on: ubuntu-latest
     needs: check
-    container:
-      image: xd009642/tarpaulin:develop-nightly
-      options: --security-opt seccomp=unconfined
     steps:
       - uses: actions/checkout@v4
       
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: stable
           components: llvm-tools-preview
+      
+      - name: Install llvm-cov
+        run: cargo install cargo-llvm-cov
       
       - name: Cache cargo
         uses: actions/cache@v4
@@ -79,22 +79,19 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
-      
-      - name: Run Tarpaulin
+
+      - name: Generate Coverage
         run: |
-          cargo tarpaulin --verbose \
-            --engine llvm \
+          cargo llvm-cov --verbose \
             --all-features \
             --workspace \
-            --timeout 120 \
-            --out xml \
-            --exclude-files "src/bin/*" \
-            --output-dir target/tarpaulin/
-      
+            --ignore-filename-regex "src/bin/*" \
+            --lcov \
+            --output-path lcov.info
+            
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          slug: amrit110/nano-vectordb-rs
-          files: target/tarpaulin/cobertura.xml
+          files: lcov.info
           verbose: true
