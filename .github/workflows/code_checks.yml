@@ -80,8 +80,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Force dependency update
-        run: cargo update -p pulp
+      - name: Force dependency resolution
+        run: |
+          cargo update -p pulp --precise 0.21.4
+          cargo update -p num-complex --precise 0.4.6
       
       - name: Run Tarpaulin
         run: |
@@ -91,7 +93,7 @@ jobs:
             --workspace \
             --timeout 120 \
             --avoid-cfg-tarpaulin \
-            --exclude-files "pulp/**" \
+            --exclude-files "candle*/**" \
             --out xml \
             --exclude-files "src/bin/*" \
             --skip-clean \
