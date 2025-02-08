@@ -59,14 +59,14 @@ jobs:
     runs-on: ubuntu-latest
     needs: check
     container:
-      image: xd009642/tarpaulin:develop-nightly
+      image: xd009642/tarpaulin:latest
       options: --security-opt seccomp=unconfined
     steps:
       - uses: actions/checkout@v4
       
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: nightly-2025-02-05
           components: llvm-tools-preview
       
       - name: Cache cargo
@@ -79,6 +79,9 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
+
+      - name: Update dependencies
+        run: cargo update -p pulp
       
       - name: Run Tarpaulin
         run: |
