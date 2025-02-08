@@ -87,12 +87,11 @@ jobs:
             --all-features \
             --workspace \
             --timeout 120 \
-            --avoid-cfg-tarpaulin \  # New flag
-            --exclude-files "src/bin/*" \
+            --avoid-cfg-tarpaulin \
             --exclude-files "pulp/**" \
-            --output-dir target/tarpaulin/ \
-            --skip-clean \
-            --no-fail-fast
+            --out xml \
+            --exclude-files "src/bin/*" \
+            --output-dir target/tarpaulin/
       
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
