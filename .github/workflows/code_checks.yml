@@ -91,7 +91,10 @@ jobs:
             --exclude-files "pulp/**" \
             --out xml \
             --exclude-files "src/bin/*" \
+            --skip-clean \
+            --no-fail-fast \
             --output-dir target/tarpaulin/
+  
       
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
