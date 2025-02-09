@@ -26,7 +26,6 @@ candle-core = "0.8.2"
 candle-transformers = "0.8.2"
 candle-nn = "0.8.2"
 tokenizers = "0.21.0"
-anyhow = "1.0"
 
 [[bin]]
 name = "benchmark"
