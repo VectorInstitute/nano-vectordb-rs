@@ -40,9 +40,9 @@ fn main() -> Result<()> {
 
     // Query similar vectors
     let query_vec = vec![0.1, 0.2, 0.3]; // Should be closest to vec1
-    let results = db.query(&query_vec, 3, None, None);
+    let results = db.query(&query_vec, 2, None, None);
 
-    println!("Top 1 results:");
+    println!("Top 2 results:");
     for result in results {
         println!(
             "- ID: {} | Color: {} | Score: {:.4}",

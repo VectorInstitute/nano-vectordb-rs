@@ -60,9 +60,9 @@ fn main() -> Result<()> {
 
     // Query similar vectors
     let query_vec = vec![0.1, 0.2, 0.3]; // Should be closest to vec1
-    let results = db.query(&query_vec, 3, None, None);
+    let results = db.query(&query_vec, 1, None, None);
 
-    println!("Top 1 results:");
+    println!("Top 1 result:");
     for result in results {
         println!(
             "- ID: {} | Color: {} | Score: {:.4}",
@@ -85,7 +85,7 @@ fn main() -> Result<()> {
 
 ## Motivation 💡
 
-**Why choose nano-vectordb-rs?** A Rust port of the popular [nano-vectordb](https://github.com/gusye1234/nano-vectordb):
+**Why choose nano-vectordb-rs?** A Rust port of the popular [nano-vectordb](https://github.com/gusye1234/nano-vectordb).
 
 ✨ **Key Features**:
 - ⚡ Fast cosine similarity searches using Rayon parallelism
@@ -93,12 +93,16 @@ fn main() -> Result<()> {
 - 📈 Embedded persistence with compact serialization
 - 🎯 No abstractions, easy to hack
 
-🔗 **Direct Port Benefits**:
-- ♻️ Familiar API for existing nano-vectordb users
-- 📊 Compatible metadata storage format
-- 🔄 Identical query semantics and scoring
-
 🏆 **Perfect For**:
 - Rust ML pipelines needing lightweight vector storage
 - Prototyping semantic search systems
-- Educational use (clean, hackable codebase)
+- Educational use (clean, hackable implementation)
+
+
+## Benchmark 🚀
+
+> Embedding Dim: 1024. Device: MacBook M4
+
+- Save a index with `100,000` vectors will generate a roughly 540M json file.
+- Insert `100,000` vectors will cost roughly `175` ms.
+- Query from `100,000` vectors will cost roughly `13` ms.
