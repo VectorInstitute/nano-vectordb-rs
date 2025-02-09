@@ -97,7 +97,7 @@ impl PartialOrd for ScoredIndex {
 
 impl Ord for ScoredIndex {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.score.partial_cmp(&other.score).unwrap_or_else(|| {
+        other.score.partial_cmp(&self.score).unwrap_or_else(|| {
             if self.score.is_nan() && other.score.is_nan() {
                 Ordering::Equal
             } else if self.score.is_nan() {
@@ -242,8 +242,7 @@ impl NanoVectorDB {
             );
 
         // Convert to sorted results
-        let mut sorted = heap.into_sorted_vec();
-        sorted.reverse();
+        let sorted = heap.into_sorted_vec();
 
         sorted
             .into_iter()
@@ -437,7 +436,7 @@ mod tests {
                     score: 0.8,
                     index: 1,
                 },
-                Ordering::Greater,
+                Ordering::Less,
             ),
             (
                 ScoredIndex {
@@ -459,7 +458,7 @@ mod tests {
                     score: 0.4,
                     index: 1,
                 },
-                Ordering::Less,
+                Ordering::Greater,
             ),
         ];
 
