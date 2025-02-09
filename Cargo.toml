@@ -2,6 +2,13 @@
 name = "nano-vectordb-rs"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "A simple, easy-to-hack vector database in rust"
+repository = "https://github.com/amrit110/nano-vectordb-rs"
+documentation = "https://docs.rs/nano-vectordb-rs"
+readme = "README.md"
+keywords = ["vector-database", "embeddings", "similarity-search"]
+categories = ["database", "science"]
 
 [dependencies]
 anyhow = "1.0"
