@@ -47,8 +47,8 @@ struct DataBase {
 
 mod base64_bytes {
     use super::*;
-    use serde::{Deserializer, Serializer};
     use bytemuck::cast_slice;
+    use serde::{Deserializer, Serializer};
 
     pub fn serialize<S: Serializer>(vec: &[Float], serializer: S) -> Result<S::Ok, S::Error> {
         let bytes = cast_slice(vec);
