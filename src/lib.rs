@@ -1,5 +1,6 @@
 //! A lightweight vector database implementation
 #![warn(missing_docs)]
+#![forbid(unsafe_code)]
 
 use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
@@ -46,15 +47,11 @@ struct DataBase {
 
 mod base64_bytes {
     use super::*;
+    use bytemuck::cast_slice;
     use serde::{Deserializer, Serializer};
 
     pub fn serialize<S: Serializer>(vec: &[Float], serializer: S) -> Result<S::Ok, S::Error> {
-        let bytes = unsafe {
-            std::slice::from_raw_parts(
-                vec.as_ptr() as *const u8,
-                vec.len() * std::mem::size_of::<Float>(),
-            )
-        };
+        let bytes = cast_slice(vec);
         let b64 = general_purpose::STANDARD.encode(bytes);
         serializer.serialize_str(&b64)
     }
@@ -92,15 +89,25 @@ impl Eq for ScoredIndex {}
 
 impl PartialOrd for ScoredIndex {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.score.partial_cmp(&other.score)
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for ScoredIndex {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap_or(Ordering::Equal)
+        self.score.partial_cmp(&other.score).unwrap_or_else(|| {
+            if self.score.is_nan() && other.score.is_nan() {
+                Ordering::Equal
+            } else if self.score.is_nan() {
+                Ordering::Less
+            } else {
+                Ordering::Greater
+            }
+        })
     }
 }
+
+type DataFilter = Box<dyn Fn(&Data) -> bool + Send + Sync>;
 
 impl NanoVectorDB {
     /// Creates a new NanoVectorDB instance
@@ -181,7 +188,7 @@ impl NanoVectorDB {
         query: &[Float],
         top_k: usize,
         better_than: Option<Float>,
-        filter: Option<Box<dyn Fn(&Data) -> bool + Send + Sync>>,
+        filter: Option<DataFilter>,
     ) -> Vec<HashMap<String, serde_json::Value>> {
         let query_norm = normalize(query);
         let embedding_dim = self.embedding_dim;
@@ -354,7 +361,6 @@ pub fn normalize(vector: &[Float]) -> Vec<Float> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json;
     use std::collections::HashMap;
     use tempfile::NamedTempFile;
 
