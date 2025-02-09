@@ -1,4 +1,6 @@
 //! A lightweight vector database implementation
+#![doc(html_root_url = "https://docs.rs/nano-vectordb-rs/0.1.0")]
+#![warn(rustdoc::missing_crate_level_docs)]
 #![warn(missing_docs)]
 #![forbid(unsafe_code)]
 
