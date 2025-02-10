@@ -1,0 +1,6 @@
+[book]
+authors = ["Amrit Krishnan"]
+language = "en"
+multilingual = false
+src = "src"
+title = "nano-vectordb-rs"
