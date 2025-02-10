@@ -4,12 +4,15 @@ Vector databases have existed for a while but recent progress in using Retrieval
 systems at scale has brought this technology to the attention of several engineering teams looking to 
 adopt AI.
 
-Vector database implementations are built with different design choices in mind. For example, some of them
-prioritize latency, while others pay more attention to scale and supporting distributed architectures. 
-But what if you are a researcher who wants to hack a naive vector database implementation and try new ideas
-to improve retrieval or semantic search? Or just someone who wants to learn the inner workings of vector
-databases? If you go looking at highly engineered implementations, you can see that they introduce several 
-abstraction layers, most of which are opaque to the user.
+Vector databases have existed for years, but recent advancements in scaling Retrieval Augmented Generation (RAG) 
+systems have drawn significant attention from engineering teams seeking to implement AI solutions.
+These implementations employ distinct design philosophies. Some prioritize low-latency operations, 
+while others emphasize scalability and distributed architecture support.
+This raises practical questions: How might researchers experiment with basic vector database 
+implementations to test novel retrieval enhancements or semantic search improvements? What about
+ developers seeking to understand the underlying mechanisms? Highly optimized production-grade systems 
+ present a challenge here – they often incorporate multiple abstraction layers that obscure implementation 
+ details from users.
 
 ``nano-vectordb-rs`` provides a simple, minimalistic implementation using Rust - a systems programming 
 language that ensures [memory safety](https://github.blog/developer-skills/programming-languages-and-frameworks/why-rust-is-the-most-admired-language-among-developers/) through its ownership and borrowing system. 

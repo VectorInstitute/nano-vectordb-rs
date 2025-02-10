@@ -460,6 +460,40 @@ mod tests {
                 },
                 Ordering::Greater,
             ),
+            // NaN cases
+            (
+                ScoredIndex {
+                    score: f32::NAN,
+                    index: 0,
+                },
+                ScoredIndex {
+                    score: 0.5,
+                    index: 1,
+                },
+                Ordering::Less,
+            ),
+            (
+                ScoredIndex {
+                    score: 0.5,
+                    index: 0,
+                },
+                ScoredIndex {
+                    score: f32::NAN,
+                    index: 1,
+                },
+                Ordering::Greater,
+            ),
+            (
+                ScoredIndex {
+                    score: f32::NAN,
+                    index: 0,
+                },
+                ScoredIndex {
+                    score: f32::NAN,
+                    index: 1,
+                },
+                Ordering::Equal,
+            ),
         ];
 
         for (a, b, expected) in cases {
