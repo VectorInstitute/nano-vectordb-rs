@@ -103,6 +103,6 @@ fn main() -> Result<()> {
 
 > Embedding Dim: 1024. Device: MacBook M4
 
-- Save a index with `100,000` vectors will generate a roughly 540M json file.
-- Insert `100,000` vectors will cost roughly `175` ms.
-- Query from `100,000` vectors will cost roughly `13` ms.
+- Saving an index with `100,000` vectors will generate a `~540M` json file.
+- Inserting `100,000` vectors in  `~175 ms`.
+- Querying from `100,000` vectors in `~13 ms`.
