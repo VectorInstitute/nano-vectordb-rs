@@ -35,7 +35,7 @@ jobs:
           touch ../book/.nojekyll  # Required for GitHub Pages
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v2
+        uses: actions/upload-pages-artifact@v3
         with:
           path: ./book
 
