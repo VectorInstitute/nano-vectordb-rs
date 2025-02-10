@@ -34,11 +34,8 @@ jobs:
           mdbook build --dest-dir ../book
           touch ../book/.nojekyll  # Required for GitHub Pages
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Deploy to Github pages
+        uses: JamesIves/github-pages-deploy-action@15de0f09300eea763baee31dff6c6184995c5f6a
         with:
-          path: ./book
-
-      - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v4
-        id: deployment
+          branch: github_pages
+          folder: ./book
