@@ -1,4 +1,4 @@
-name: publish post
+name: Deploy Documentation
 
 on:
   push:
@@ -32,11 +32,13 @@ jobs:
         run: |
           cd docs
           mdbook build --dest-dir ../book
-          touch ../book/.nojekyll
+          touch ../book/.nojekyll  # Required for GitHub Pages
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: ./book
 
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
         id: deployment
-        with:
-          artifact_name: documentation
-          path: ./book
