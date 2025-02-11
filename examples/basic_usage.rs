@@ -1,3 +1,4 @@
+// A basic example demonstrating the usage of NanoVectorDB for similarity search.
 use anyhow::Result;
 use nano_vectordb_rs::{constants, Data, NanoVectorDB};
 use serde_json::json;

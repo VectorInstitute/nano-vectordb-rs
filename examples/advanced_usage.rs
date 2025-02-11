@@ -1,3 +1,4 @@
+// An advanced example demonstrating how to load a dataset and upsert it into NanoVectorDB for similarity search.
 use anyhow::Result;
 use hf_hub::api::sync::ApiBuilder;
 use nano_vectordb_rs::{constants, Data, NanoVectorDB};
