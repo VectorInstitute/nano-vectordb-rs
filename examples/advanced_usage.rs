@@ -80,7 +80,6 @@ fn main() -> Result<()> {
             let embedding: Vec<f32> = (0..list.len())
                 .map(|i| {
                     list.get_float(i)
-                        .map(|v| v as f32)
                         .or_else(|_| list.get_double(i).map(|v| v as f32))
                         .unwrap_or(0.0)
                 })
@@ -122,7 +121,6 @@ fn main() -> Result<()> {
     let query_vector: Vec<f32> = (0..list.len())
         .map(|i| {
             list.get_float(i)
-                .map(|v| v as f32)
                 .or_else(|_| list.get_double(i).map(|v| v as f32))
                 .unwrap_or(0.0)
         })
