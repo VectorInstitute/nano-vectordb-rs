@@ -1,5 +1,6 @@
 // An advanced example demonstrating how to load a dataset and upsert it into NanoVectorDB for similarity search.
 use anyhow::Result;
+use colored::Colorize;
 use hf_hub::api::sync::ApiBuilder;
 use nano_vectordb_rs::{constants, Data, NanoVectorDB};
 use parquet::file::reader::SerializedFileReader;
@@ -34,7 +35,12 @@ fn main() -> Result<()> {
             samples.push(row);
         }
     }
-    println!("Loaded {} samples from Wikipedia dataset", samples.len());
+    println!(
+        "{}",
+        format!("Loaded {} samples from Wikipedia dataset", samples.len())
+            .green()
+            .bold()
+    );
 
     // Initialize vector database
     let temp_file = NamedTempFile::new()?;
@@ -95,25 +101,34 @@ fn main() -> Result<()> {
 
     // Upsert data
     let (updates, inserts) = db.upsert(data_entries)?;
-    println!("Updated: {}, Inserted: {}", updates.len(), inserts.len());
+    println!(
+        "{} {} / {}",
+        "Operation complete:".bold().cyan(),
+        format!("Updated: {}", updates.len()).yellow(),
+        format!("Inserted: {}", inserts.len()).green()
+    );
     db.save()?;
 
     let query_sample = &samples[0];
 
-    println!("\nQuery Sample:");
+    println!("\n{}", "Query Sample:".bold().underline());
     println!(
-        "Title: {}",
+        "{} {}",
+        "Title:".bold().cyan(),
         query_sample
             .get_string(TITLE_IDX)
             .map(|s| s.as_str())
             .unwrap_or("[No Title]")
+            .italic()
     );
     println!(
-        "Text: {}",
+        "{} {}",
+        "Text:".bold().cyan(),
         query_sample
             .get_string(TEXT_IDX)
             .map(|s| s.as_str())
             .unwrap_or("[No Text]")
+            .dimmed()
     );
 
     // Get query vector
@@ -129,18 +144,24 @@ fn main() -> Result<()> {
     // Perform search
     let results = db.query(&query_vector, 5, Some(0.5), None);
 
-    println!("\nTop 5 Similar Entries:");
+    println!("\n{}", "Top 5 Similar Entries:".bold().underline());
     for result in results {
         println!(
-            "- {} (Score: {:.4})\n  Summary: {}...",
-            result[constants::F_ID].as_str().unwrap_or("[Invalid ID]"),
-            result[constants::F_METRICS],
+            "{} {} {}\n  {}...",
+            "-".bold(),
+            format!(
+                "ID: {}",
+                result[constants::F_ID].as_str().unwrap_or("[Invalid ID]")
+            )
+            .blue(),
+            format!("(Score: {:.4})", result[constants::F_METRICS]).yellow(),
             result["text"]
                 .as_str()
                 .unwrap_or("")
                 .chars()
                 .take(100)
                 .collect::<String>()
+                .dimmed()
         );
     }
 
