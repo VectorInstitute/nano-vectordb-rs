@@ -83,6 +83,19 @@ fn main() -> Result<()> {
 }
 ```
 
+You can also run this example using the following command:
+
+```bash
+cargo run --example basic_usage
+```
+
+An advanced example which loads an embedding dataset from huggingface and shows the
+vectordb usage can be run using the following command:
+
+```bash
+cargo run --example advanced_usage
+```
+
 ## Motivation 💡
 
 **Why choose nano-vectordb-rs?** A Rust port of the popular [nano-vectordb](https://github.com/gusye1234/nano-vectordb).
