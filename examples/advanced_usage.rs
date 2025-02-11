@@ -1,6 +1,8 @@
 // An advanced example demonstrating how to load a dataset and upsert it into NanoVectorDB for similarity search.
 use anyhow::Result;
 use colored::Colorize;
+use comfy_table::presets::UTF8_FULL;
+use comfy_table::{Attribute, Cell, Color, ContentArrangement, Table};
 use hf_hub::api::sync::ApiBuilder;
 use nano_vectordb_rs::{constants, Data, NanoVectorDB};
 use parquet::file::reader::SerializedFileReader;
@@ -111,25 +113,33 @@ fn main() -> Result<()> {
 
     let query_sample = &samples[0];
 
-    println!("\n{}", "Query Sample:".bold().underline());
-    println!(
-        "{} {}",
-        "Title:".bold().cyan(),
-        query_sample
-            .get_string(TITLE_IDX)
-            .map(|s| s.as_str())
-            .unwrap_or("[No Title]")
-            .italic()
-    );
-    println!(
-        "{} {}",
-        "Text:".bold().cyan(),
-        query_sample
-            .get_string(TEXT_IDX)
-            .map(|s| s.as_str())
-            .unwrap_or("[No Text]")
-            .dimmed()
-    );
+    // Query Sample Section
+    let mut sample_table = Table::new();
+    sample_table
+        .load_preset(UTF8_FULL)
+        .set_content_arrangement(ContentArrangement::Dynamic)
+        .set_header(vec![Cell::new(" QUERY SAMPLE ")
+            .fg(Color::White)
+            .bg(Color::Cyan)
+            .add_attribute(Attribute::Bold)])
+        .add_row(vec![Cell::new(format!(
+            "Title: {}",
+            query_sample
+                .get_string(TITLE_IDX)
+                .map(|s| s.as_str())
+                .unwrap_or("[No Title]")
+        ))
+        .fg(Color::Cyan)])
+        .add_row(vec![Cell::new(format!(
+            "Text: {}",
+            query_sample
+                .get_string(TEXT_IDX)
+                .map(|s| s.as_str())
+                .unwrap_or("[No Text]")
+        ))
+        .fg(Color::Cyan)
+        .add_attribute(Attribute::Dim)]);
+    println!("{sample_table}");
 
     // Get query vector
     let list = query_sample.get_list(EMBEDDING_IDX).unwrap();
@@ -144,26 +154,45 @@ fn main() -> Result<()> {
     // Perform search
     let results = db.query(&query_vector, 5, Some(0.5), None);
 
-    println!("\n{}", "Top 5 Similar Entries:".bold().underline());
+    // Results Table
+    let mut results_table = Table::new();
+    results_table
+        .load_preset(UTF8_FULL)
+        .set_content_arrangement(ContentArrangement::Dynamic)
+        .set_header(vec![
+            Cell::new("ID")
+                .fg(Color::Magenta)
+                .add_attribute(Attribute::Bold),
+            Cell::new("Score")
+                .fg(Color::Yellow)
+                .add_attribute(Attribute::Bold),
+            Cell::new("Summary")
+                .fg(Color::Blue)
+                .add_attribute(Attribute::Bold),
+        ]);
+
     for result in results {
-        println!(
-            "{} {} {}\n  {}...",
-            "-".bold(),
-            format!(
-                "ID: {}",
-                result[constants::F_ID].as_str().unwrap_or("[Invalid ID]")
+        results_table.add_row(vec![
+            Cell::new(result[constants::F_ID].as_str().unwrap_or("[Invalid ID]")).fg(Color::Blue),
+            Cell::new(format!("{:.4}", result[constants::F_METRICS])).fg(Color::Yellow),
+            Cell::new(
+                result["text"]
+                    .as_str()
+                    .unwrap_or("")
+                    .chars()
+                    .take(100)
+                    .collect::<String>(),
             )
-            .blue(),
-            format!("(Score: {:.4})", result[constants::F_METRICS]).yellow(),
-            result["text"]
-                .as_str()
-                .unwrap_or("")
-                .chars()
-                .take(100)
-                .collect::<String>()
-                .dimmed()
-        );
+            .fg(Color::White)
+            .add_attribute(Attribute::Dim),
+        ]);
     }
+
+    println!(
+        "\n{}",
+        " TOP 5 SIMILAR ENTRIES ".bold().on_magenta().black()
+    );
+    println!("{results_table}");
 
     Ok(())
 }
