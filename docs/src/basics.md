@@ -58,10 +58,4 @@ In the querying step, these maps or indexes are then used to retrieve similar ve
 
 Besides these core components, there are several other techniques and tools used to build 
 scalable and reliable vector databases such as sharding, replication, multi-tenancy, etc.
-
-
-
-
-
-
-
+We will not go into these details, since we are focusing on the basics.
