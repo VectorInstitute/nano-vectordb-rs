@@ -3,3 +3,11 @@
 * SIMD-optimized similarity searches using Rayon parallelism
 * Bare-metal memory management for cache efficiency
 * Zero-dependency serialization strategies
+
+
+### Basic usage example
+
+
+
+### Advanced usage example
+
